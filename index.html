@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>El viaje de un contenedor · Logística y aduanas en 3D</title>
+  <meta name="description" content="Recorrido 3D interactivo por la logística y las aduanas de una importación marítima. Contenido didáctico y ficticio.">
+  <meta name="theme-color" content="#0b1626">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='9' width='28' height='15' rx='2' fill='%23e8742f'/%3E%3Cpath d='M7 11v11M11 11v11M15 11v11M19 11v11M23 11v11' stroke='%230b1626' stroke-width='1.6'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="src/ui/styles.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./src/vendor/three/three.module.js",
+        "three/addons/": "./src/vendor/three/addons/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <a class="skip" href="#hotspots">Saltar a los puntos interactivos</a>
+
+  <canvas id="lienzo" aria-label="Escena 3D del viaje del contenedor" role="img"></canvas>
+
+  <!-- Barra superior -->
+  <header class="topbar" id="topbar">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect x="2" y="9" width="28" height="15" rx="2" fill="#e8742f"/><path d="M7 11v11M11 11v11M15 11v11M19 11v11M23 11v11" stroke="#0b1626" stroke-width="1.6"/></svg>
+      <div class="brand-text">
+        <h1>El viaje de un contenedor</h1>
+        <p>Logística y aduanas, paso a paso</p>
+      </div>
+    </div>
+    <div class="incoterm" role="radiogroup" aria-label="Incoterm 2020" id="incotermBar">
+      <span class="incoterm-label">Incoterm</span>
+    </div>
+    <div class="tools">
+      <button class="btn icon" id="btnLibre" aria-pressed="false" title="Vista libre (F)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3"/></svg>
+        <span class="lbl">Vista libre</span>
+      </button>
+      <button class="btn icon" id="btnPausa" aria-pressed="false" title="Pausar animaciones (P)">
+        <svg viewBox="0 0 24 24" aria-hidden="true" class="ico-pausa"><path d="M8 5v14M16 5v14"/></svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true" class="ico-play"><path d="M7 5l12 7-12 7z"/></svg>
+        <span class="lbl">Pausa</span>
+      </button>
+      <label class="select" title="Calidad gráfica">
+        <span class="sr-only">Calidad gráfica</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18h4M4 12h10M4 6h16"/></svg>
+        <select id="selCalidad">
+          <option value="auto">Auto</option>
+          <option value="alta">Alta</option>
+          <option value="media">Media</option>
+          <option value="baja">Baja</option>
+        </select>
+      </label>
+      <button class="btn icon" id="btnAyuda" title="Ayuda y atajos (H)" aria-haspopup="dialog">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .9-1 1.6V14M12 17.2v.1"/></svg>
+        <span class="lbl">Ayuda</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Panel de costes (siempre visible) -->
+  <aside class="costes" id="costes" aria-label="Costes acumulados">
+    <button class="costes-head" id="costesToggle" aria-expanded="true" aria-controls="costesBody">
+      <span class="k">Coste acumulado</span>
+      <span class="v mono" id="totalAcum" aria-live="polite">0,00 €</span>
+      <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      <span class="split" aria-hidden="true"><span class="split-v" id="splitV"></span><span class="split-c" id="splitC"></span></span>
+    </button>
+    <div class="costes-body" id="costesBody">
+      <div class="split-legend">
+        <span><i class="dot v"></i>Vendedor <b class="mono" id="totV">0 €</b></span>
+        <span><i class="dot c"></i>Comprador <b class="mono" id="totC">0 €</b></span>
+      </div>
+      <label class="chk"><input type="checkbox" id="chkIVA" checked> Incluir IVA de importación</label>
+      <ol class="fases" id="listaFases"></ol>
+      <p class="nota" id="notaCostes">Incluye el valor de la mercancía (45.000 €).</p>
+    </div>
+  </aside>
+
+  <!-- Capa de hotspots -->
+  <div id="hotspots" class="hotspots" aria-label="Puntos interactivos de la escena"></div>
+  <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
+
+  <!-- Panel lateral de detalle -->
+  <section class="detalle" id="detalle" role="dialog" aria-modal="false" aria-labelledby="detTitulo" hidden>
+    <div class="det-head">
+      <p class="det-fase" id="detFase"></p>
+      <h2 id="detTitulo"></h2>
+      <button class="btn icon close" id="detCerrar" aria-label="Cerrar panel (Esc)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="det-body" id="detCuerpo"></div>
+    <div class="det-foot">
+      <button class="btn ghost" id="detVista">Vista general</button>
+      <button class="btn primary" id="detSiguiente">Siguiente punto <span aria-hidden="true">›</span></button>
+    </div>
+  </section>
+
+  <!-- Pie: escena actual y progreso -->
+  <footer class="pie" id="pie">
+    <div class="rotulo" id="rotulo" aria-live="polite">
+      <span class="n mono" id="rotN">1/7</span>
+      <div><strong id="rotNombre"></strong><span id="rotLugar"></span></div>
+      <span class="hora" id="rotHora"></span>
+    </div>
+    <nav class="progreso" aria-label="Escenas">
+      <button class="btn nav" id="btnAnt" aria-label="Escena anterior (←)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg><span class="lbl">Anterior</span></button>
+      <ol class="pasos" id="pasos"></ol>
+      <button class="btn nav primary" id="btnSig" aria-label="Escena siguiente (→)"><span class="lbl">Siguiente</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+    </nav>
+  </footer>
+
+  <!-- Resumen final -->
+  <section class="resumen" id="resumen" role="dialog" aria-modal="true" aria-labelledby="resTitulo" hidden>
+    <div class="res-card">
+      <header class="res-head">
+        <div>
+          <p class="det-fase">Resumen final</p>
+          <h2 id="resTitulo">¿Cuánto cuesta el contenedor puesto en destino?</h2>
+        </div>
+        <label class="chk"><input type="checkbox" id="chkIVARes"> Incluir IVA (deducible)</label>
+      </header>
+      <div class="kpis" id="kpis"></div>
+      <figure class="grafico">
+        <figcaption>Costes logísticos y aduaneros por fase (cascada), según quién paga con el Incoterm elegido. No incluye la mercancía.</figcaption>
+        <div id="cascada"></div>
+      </figure>
+      <details class="tabla-det">
+        <summary>Ver el detalle de todas las partidas</summary>
+        <div id="tablaPartidas"></div>
+      </details>
+      <footer class="res-foot">
+        <p class="nota">Contenido didáctico. Empresas, importes, documentos y códigos son ficticios.</p>
+        <div>
+          <button class="btn ghost" id="resVolver">Volver a la entrega</button>
+          <button class="btn primary" id="resReiniciar">Empezar de nuevo</button>
+        </div>
+      </footer>
+    </div>
+  </section>
+
+  <!-- Ayuda -->
+  <section class="ayuda" id="ayuda" role="dialog" aria-modal="true" aria-labelledby="ayTitulo" hidden>
+    <div class="ay-card">
+      <h2 id="ayTitulo">Cómo moverse</h2>
+      <ul>
+        <li><kbd>←</kbd> <kbd>→</kbd> Escena anterior / siguiente · <kbd>1</kbd>–<kbd>7</kbd> ir a una escena · <kbd>0</kbd> resumen</li>
+        <li><kbd>Tab</kbd> recorre los puntos interactivos · <kbd>Intro</kbd> abre el panel · <kbd>Esc</kbd> lo cierra</li>
+        <li><kbd>F</kbd> vista libre · <kbd>P</kbd> pausa · <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> desplazar la cámara</li>
+        <li>Ratón: arrastra para orbitar, rueda para acercar, botón derecho para desplazar. Táctil: un dedo orbita, dos dedos acercan y desplazan.</li>
+        <li>El selector de Incoterm (arriba) recalcula en vivo quién paga cada partida.</li>
+      </ul>
+      <p class="nota">Todo es ficticio: empresas, importes, documentos y códigos.</p>
+      <button class="btn primary" id="ayCerrar">Entendido</button>
+    </div>
+  </section>
+
+  <!-- Pantalla de carga -->
+  <div class="carga" id="carga" role="status" aria-live="polite">
+    <div class="carga-card">
+      <svg class="brand-mark big" viewBox="0 0 32 32" aria-hidden="true"><rect x="2" y="9" width="28" height="15" rx="2" fill="#e8742f"/><path d="M7 11v11M11 11v11M15 11v11M19 11v11M23 11v11" stroke="#0b1626" stroke-width="1.6"/></svg>
+      <h1>El viaje de un contenedor</h1>
+      <p class="sub">De la firma del contrato a la libre circulación: siete escenas, cada coste en su sitio.</p>
+      <div class="barra" aria-hidden="true"><div id="cargaBarra"></div></div>
+      <p class="estado mono" id="cargaEstado">Preparando…</p>
+      <button class="btn primary big" id="btnEmpezar" hidden>Empezar el viaje</button>
+      <p class="nota">Contenido didáctico. Empresas, importes, documentos y códigos son ficticios.</p>
+    </div>
+  </div>
+
+  <div class="fundido" id="fundido" aria-hidden="true"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  <noscript><p class="noscript">Esta experiencia necesita JavaScript y WebGL.</p></noscript>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
